@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅游足迹 - 记录你的旅行故事</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/v4-shims.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36D399',
+                        accent: '#F87272',
+                        neutral: '#F3F4F6',
+                        'neutral-dark': '#1F2937'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+            .province-hover {
+                transition: all 0.3s ease;
+            }
+            .province-hover:hover {
+                cursor: pointer;
+                filter: brightness(1.1);
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-white/90 backdrop-blur-sm shadow-lg fixed w-full top-0 z-50 transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <img src="https://aka.doubaocdn.com/s/aFut1w7ox7" alt="旅游足迹Logo" class="h-10 w-10 rounded-full">
+                    <h1 class="text-xl font-bold text-primary">旅游足迹</h1>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="text-gray-700 hover:text-primary transition-colors duration-200">首页</a>
+                    <a href="#map" class="text-gray-700 hover:text-primary transition-colors duration-200">足迹地图</a>
+                    <a href="#share" class="text-gray-700 hover:text-primary transition-colors duration-200">旅行分享</a>
+                    <a href="#profile" class="text-gray-700 hover:text-primary transition-colors duration-200">个人中心</a>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div id="userMenu" class="relative">
+                        <button id="loginBtn" class="bg-primary text-white px-4 py-2 rounded-full hover:bg-primary/90 transition-colors duration-200 flex items-center space-x-2">
+                            <i class="fa fa-user"></i>
+                            <span>登录</span>
+                        </button>
+                        
+                        <!-- 下拉菜单 -->
+                        <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
+                            <a href="#profile" class="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors duration-200">
+                                <i class="fa fa-user mr-2"></i>个人中心
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors duration-200">
+                                <i class="fa fa-cog mr-2"></i>设置
+                            </a>
+                            <div class="border-t border-gray-200 my-1"></div>
+                            <button id="logoutBtn" class="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition-colors duration-200">
+                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button class="md:hidden text-gray-700" id="mobileMenuBtn">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 移动端菜单 -->
+        <div class="md:hidden hidden bg-white shadow-lg" id="mobileMenu">
+            <div class="px-4 py-2 space-y-2">
+                <a href="#home" class="block py-2 text-gray-700 hover:text-primary transition-colors duration-200">首页</a>
+                <a href="#map" class="block py-2 text-gray-700 hover:text-primary transition-colors duration-200">足迹地图</a>
+                <a href="#share" class="block py-2 text-gray-700 hover:text-primary transition-colors duration-200">旅行分享</a>
+                <a href="#profile" class="block py-2 text-gray-700 hover:text-primary transition-colors duration-200">个人中心</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 登录模态框 -->
+    <div id="loginModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">欢迎回来</h2>
+                    <button id="closeModal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <button id="emailLoginBtn" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition-colors duration-200 font-medium flex items-center justify-center space-x-2">
+                        <i class="fa fa-envelope"></i>
+                        <span>邮箱登录</span>
+                    </button>
+                    
+                    <button id="githubLoginBtn" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors duration-200 font-medium flex items-center justify-center space-x-2">
+                        <i class="fa fa-github"></i>
+                        <span>GitHub登录</span>
+                    </button>
+                    
+                    <button id="googleLoginBtn" class="w-full bg-white text-gray-800 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors duration-200 font-medium flex items-center justify-center space-x-2">
+                        <i class="fa fa-google text-red-500"></i>
+                        <span>Google登录</span>
+                    </button>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <p class="text-gray-600 mb-4">还没有账号？<a href="#" class="text-primary hover:text-primary/80 transition-colors duration-200">立即注册</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 首页横幅 -->
+    <section id="home" class="pt-24 pb-16 bg-gradient-to-r from-primary/10 to-secondary/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="space-y-6">
+                    <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-gray-800 leading-tight">
+                        记录你的<br>
+                        <span class="text-primary">旅行足迹</span>
+                    </h2>
+                    <p class="text-[clamp(1rem,2vw,1.25rem)] text-gray-600 leading-relaxed">
+                        每一次旅行都是一段珍贵的回忆，用地图标记你的足迹，分享你的旅行故事，让世界看到你的精彩旅程。
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="startMarkingBtn" class="bg-primary text-white px-8 py-3 rounded-full hover:bg-primary/90 transition-all duration-300 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl">
+                            <i class="fa fa-map-marker"></i>
+                            <span>开始标记足迹</span>
+                        </button>
+                        <button id="viewSharesBtn" class="border-2 border-primary text-primary px-8 py-3 rounded-full hover:bg-primary/10 transition-all duration-300 flex items-center justify-center space-x-2">
+                            <i class="fa fa-image"></i>
+                            <span>查看旅行分享</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="relative">
+                    <img src="https://aka.doubaocdn.com/s/nuBV1w7oxD" alt="美丽的风景" class="rounded-2xl shadow-2xl w-full h-auto">
+                    <div class="absolute -bottom-6 -left-6 bg-white p-4 rounded-lg shadow-lg card-hover">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                                <i class="fa fa-map text-primary text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-800">已标记</p>
+                                <p class="text-2xl font-bold text-primary" id="visitedCount">0</p>
+                                <p class="text-sm text-gray-500">个省份</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 足迹地图 -->
+    <section id="map" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 mb-4">我的足迹地图</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">点击地图上的省份，标记你曾经去过的地方，记录你的旅行足迹</p>
+            </div>
+            
+            <div class="grid lg:grid-cols-4 gap-8">
+                <!-- 地图容器 -->
+                <div class="lg:col-span-3">
+                    <div class="bg-gradient-to-br from-blue-50 to-green-50 rounded-2xl p-6 shadow-lg">
+                        <div id="chinaMap" class="w-full h-[600px] rounded-lg"></div>
+                    </div>
+                </div>
+                
+                <!-- 侧边栏 -->
+                <div class="space-y-6">
+                    <!-- 足迹统计 -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                            <i class="fa fa-bar-chart text-primary"></i>
+                            <span>足迹统计</span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">已访问省份</span>
+                                <span class="font-bold text-primary" id="visitedProvinces">0 / 34</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="progressBar" class="bg-primary h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 mt-6">
+                                <div class="text-center p-3 bg-primary/5 rounded-lg">
+                                    <p class="text-sm text-gray-500">旅行天数</p>
+                                    <p class="text-xl font-bold text-primary" id="travelDays">0</p>
+                                </div>
+                                <div class="text-center p-3 bg-secondary/5 rounded-lg">
+                                    <p class="text-sm text-gray-500">分享内容</p>
+                                    <p class="text-xl font-bold text-secondary" id="shareCount">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 最近访问 -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                            <i class="fa fa-history text-primary"></i>
+                            <span>最近访问</span>
+                        </h3>
+                        
+                        <div id="recentVisited" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">暂无访问记录</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 快速操作 -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                            <i class="fa fa-bolt text-primary"></i>
+                            <span>快速操作</span>
+                        </h3>
+                        
+                        <div class="space-y-3">
+                            <button id="clearAll" class="w-full bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors duration-200 flex items-center justify-center space-x-2">
+                                <i class="fa fa-trash"></i>
+                                <span>清除所有标记</span>
+                            </button>
+                            <button id="exportMap" class="w-full bg-green-50 text-green-600 py-2 rounded-lg hover:bg-green-100 transition-colors duration-200 flex items-center justify-center space-x-2">
+                                <i class="fa fa-download"></i>
+                                <span>导出足迹地图</span>
+                            </button>
+                            <button id="shareMap" class="w-full bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors duration-200 flex items-center justify-center space-x-2">
+                                <i class="fa fa-share-alt"></i>
+                                <span>分享我的足迹</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 旅行分享 -->
+    <section id="share" class="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 mb-4">旅行分享</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">分享你的旅行故事，查看他人的精彩旅程，发现更多旅行灵感</p>
+            </div>
+            
+            <!-- 分享筛选 -->
+            <div class="flex flex-wrap justify-center gap-4 mb-12">
+                <button class="share-filter-btn active px-6 py-2 rounded-full bg-primary text-white hover:bg-primary/90 transition-colors duration-200" data-filter="all">
+                    全部
+                </button>
+                <button class="share-filter-btn px-6 py-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-filter="攻略">
+                    旅游攻略
+                </button>
+                <button class="share-filter-btn px-6 py-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-filter="照片">
+                    旅行照片
+                </button>
+                <button class="share-filter-btn px-6 py-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 transition-colors duration-200" data-filter="游记">
+                    旅行游记
+                </button>
+            </div>
+            
+            <!-- 分享内容网格 -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8" id="shareGrid">
+                <!-- 分享卡片 1 -->
+                <div class="share-card bg-white rounded-2xl shadow-lg overflow-hidden card-hover" data-category="攻略">
+                    <div class="relative">
+                        <img src="https://aka.doubaocdn.com/s/zwgT1vzTzB" alt="旅行照片" class="w-full h-48 object-cover">
+                        <div class="absolute top-4 left-4 bg-primary text-white px-3 py-1 rounded-full text-sm">
+                            旅游攻略
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">云南大理三日游攻略</h3>
+                        <p class="text-gray-600 text-sm mb-4">探索大理的风花雪月，感受古城的宁静与洱海的浪漫...</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <img src="https://via.placeholder.com/40" alt="用户头像" class="w-8 h-8 rounded-full">
+                                <span class="text-sm text-gray-600">旅行者小王</span>
+                            </div>
+                            <div class="flex items-center space-x-3 text-sm text-gray-500">
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-heart"></i>
+                                    <span>128</span>
+                                </span>
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-comment"></i>
+                                    <span>24</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 分享卡片 2 -->
+                <div class="share-card bg-white rounded-2xl shadow-lg overflow-hidden card-hover" data-category="照片">
+                    <div class="relative">
+                        <img src="https://aka.doubaocdn.com/s/6nwn1vzTzB" alt="旅行照片" class="w-full h-48 object-cover">
+                        <div class="absolute top-4 left-4 bg-secondary text-white px-3 py-1 rounded-full text-sm">
+                            旅行照片
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">雪山徒步的美好时光</h3>
+                        <p class="text-gray-600 text-sm mb-4">在雪山上留下的足迹，每一步都是对自然的敬畏...</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <img src="https://via.placeholder.com/40" alt="用户头像" class="w-8 h-8 rounded-full">
+                                <span class="text-sm text-gray-600">户外爱好者</span>
+                            </div>
+                            <div class="flex items-center space-x-3 text-sm text-gray-500">
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-heart"></i>
+                                    <span>256</span>
+                                </span>
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-comment"></i>
+                                    <span>42</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 分享卡片 3 -->
+                <div class="share-card bg-white rounded-2xl shadow-lg overflow-hidden card-hover" data-category="游记">
+                    <div class="relative">
+                        <img src="https://aka.doubaocdn.com/s/HzGr1w7oxE" alt="旅行照片" class="w-full h-48 object-cover">
+                        <div class="absolute top-4 left-4 bg-accent text-white px-3 py-1 rounded-full text-sm">
+                            旅行游记
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">江南水乡的温柔时光</h3>
+                        <p class="text-gray-600 text-sm mb-4">小桥流水人家，感受江南水乡的独特韵味...</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <img src="https://via.placeholder.com/40" alt="用户头像" class="w-8 h-8 rounded-full">
+                                <span class="text-sm text-gray-600">文艺青年</span>
+                            </div>
+                            <div class="flex items-center space-x-3 text-sm text-gray-500">
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-heart"></i>
+                                    <span>189</span>
+                                </span>
+                                <span class="flex items-center space-x-1">
+                                    <i class="fa fa-comment"></i>
+                                    <span>36</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 加载更多 -->
+            <div class="text-center mt-12">
+                <button id="loadMoreBtn" class="bg-white text-primary border-2 border-primary px-8 py-3 rounded-full hover:bg-primary/10 transition-all duration-300 flex items-center justify-center space-x-2 mx-auto">
+                    <i class="fa fa-refresh"></i>
+                    <span>加载更多</span>
+                </button>
+            </div>
+            
+            <!-- 发布分享按钮 -->
+            <div class="fixed bottom-6 right-6 z-40">
+                <button id="publishBtn" class="w-14 h-14 bg-primary text-white rounded-full shadow-2xl hover:bg-primary/90 transition-all duration-300 flex items-center justify-center">
+                    <i class="fa fa-plus text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 个人中心 -->
+    <section id="profile" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 mb-4">个人中心</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">管理你的个人信息，查看旅行统计，设置隐私偏好</p>
+            </div>
+            
+            <div id="profileContent" class="grid lg:grid-cols-4 gap-8">
+                <!-- 未登录状态 -->
+                <div id="notLoggedInProfile" class="col-span-full text-center py-12">
+                    <div class="inline-block w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-user text-gray-400 text-4xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">请先登录</h3>
+                    <p class="text-gray-600 mb-6">登录后可以查看和管理你的旅行足迹</p>
+                    <button id="loginFromProfileBtn" class="bg-primary text-white px-8 py-3 rounded-full hover:bg-primary/90 transition-colors duration-200">
+                        立即登录
+                    </button>
+                </div>
+                
+                <!-- 已登录状态 -->
+                <div id="loggedInProfile" class="hidden">
+                    <!-- 个人信息 -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-xl shadow-lg p-6 text-center sticky top-24">
+                            <div class="relative inline-block mb-4">
+                                <img id="userAvatar" src="https://via.placeholder.com/120" alt="用户头像" class="w-24 h-24 rounded-full mx-auto">
+                                <button class="absolute bottom-0 right-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors duration-200">
+                                    <i class="fa fa-camera text-sm"></i>
+                                </button>
+                            </div>
+                            <h3 class="font-bold text-gray-800 mb-1" id="userName">游客</h3>
+                            <p class="text-gray-600 text-sm mb-4">旅行爱好者</p>
+                            
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <p class="text-2xl font-bold text-primary" id="userVisitedCount">0</p>
+                                    <p class="text-sm text-gray-500">已访省份</p>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold text-secondary" id="userShareCount">0</p>
+                                    <p class="text-sm text-gray-500">分享内容</p>
+                                </div>
+                            </div>
+                            
+                            <button id="editProfile" class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center justify-center space-x-2">
+                                <i class="fa fa-edit"></i>
+                                <span>编辑资料</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 个人统计 -->
+                    <div class="lg:col-span-3 space-y-8">
+                        <!-- 旅行统计 -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <h3 class="font-bold text-gray-800 mb-6 flex items-center space-x-2">
+                                <i class="fa fa-line-chart text-primary"></i>
+                                <span>旅行统计</span>
+                            </h3>
+                            
+                            <div class="grid md:grid-cols-3 gap-6">
+                                <div class="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
+                                    <i class="fa fa-map-marker text-primary text-3xl mb-3"></i>
+                                    <p class="text-2xl font-bold text-gray-800" id="totalProvinces">0</p>
+                                    <p class="text-gray-600">已访省份</p>
+                                </div>
+                                <div class="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
+                                    <i class="fa fa-calendar text-secondary text-3xl mb-3"></i>
+                                    <p class="text-2xl font-bold text-gray-800" id="totalDays">0</p>
+                                    <p class="text-gray-600">旅行天数</p>
+                                </div>
+                                <div class="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg">
+                                    <i class="fa fa-camera text-orange-500 text-3xl mb-3"></i>
+                                    <p class="text-2xl font-bold text-gray-800" id="totalPhotos">0</p>
+                                    <p class="text-gray-600">照片数量</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-8">
+                                <h4 class="font-semibold text-gray-800 mb-4">旅行足迹分布</h4>
+                                <div id="travelChart" class="w-full h-64"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 我的分享 -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="font-bold text-gray-800 flex items-center space-x-2">
+                                    <i class="fa fa-share-alt text-primary"></i>
+                                    <span>我的分享</span>
+                                </h3>
+                                <button id="addShareBtn" class="text-primary hover:text-primary/80 transition-colors duration-200 text-sm">
+                                    <i class="fa fa-plus mr-1"></i>添加分享
+                                </button>
+                            </div>
+                            
+                            <div id="myShares" class="space-y-4">
+                                <p class="text-gray-500 text-center py-8">你还没有分享任何内容，快去发布你的旅行故事吧！</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 设置选项 -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <h3 class="font-bold text-gray-800 mb-6 flex items-center space-x-2">
+                                <i class="fa fa-bullseye text-primary"></i>
+                                <span>设置选项</span>
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <i class="fa fa-user text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-gray-800">个人资料</p>
+                                            <p class="text-sm text-gray-600">编辑你的个人信息</p>
+                                        </div>
+                                    </div>
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                            <i class="fa fa-bullseye text-secondary"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-gray-800">隐私设置</p>
+                                            <p class="text-sm text-gray-600">管理你的隐私偏好</p>
+                                        </div>
+                                    </div>
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                            <i class="fa fa-bell text-purple-500"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-gray-800">通知设置</p>
+                                            <p class="text-sm text-gray-600">设置你的通知偏好</p>
+                                        </div>
+                                    </div>
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                            <i class="fa fa-sign-out text-red-500"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-gray-800">退出登录</p>
+                                            <p class="text-sm text-gray-600">安全退出你的账号</p>
+                                        </div>
+                                    </div>
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <img src="https://aka.doubaocdn.com/s/aFut1w7ox7" alt="旅游足迹Logo" class="h-10 w-10 rounded-full">
+                        <h3 class="text-xl font-bold">旅游足迹</h3>
+                    </div>
+                    <p class="text-gray-400 mb-4">记录你的旅行足迹，分享你的精彩故事</p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fa fa-weibo text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fa fa-wechat text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors duration-200">
+                            <i class="fa fa-qq text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold mb-4">快速链接</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#home" class="hover:text-white transition-colors duration-200">首页</a></li>
+                        <li><a href="#map" class="hover:text-white transition-colors duration-200">足迹地图</a></li>
+                        <li><a href="#share" class="hover:text-white transition-colors duration-200">旅行分享</a></li>
+                        <li><a href="#profile" class="hover:text-white transition-colors duration-200">个人中心</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold mb-4">帮助中心</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-colors duration-200">使用指南</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors duration-200">常见问题</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors duration-200">联系我们</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors duration-200">意见反馈</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold mb-4">联系我们</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center space-x-2">
+                            <i class="fa fa-envelope"></i>
+                            <span>contact@travelfootprint.com</span>
+                        </li>
+                        <li class="flex items-center space-x-2">
+                            <i class="fa fa-phone"></i>
+                            <span>400-123-4567</span>
+                        </li>
+                        <li class="flex items-center space-x-2">
+                            <i class="fa fa-map-marker"></i>
+                            <span>北京市朝阳区</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2026 旅游足迹. 保留所有权利.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 发布分享模态框 -->
+    <div id="publishModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0" id="publishModalContent">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">发布旅行分享</h2>
+                    <button id="closePublishModal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="publishForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">分享类型</label>
+                        <div class="grid grid-cols-3 gap-3">
+                            <label class="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200">
+                                <input type="radio" name="shareType" value="攻略" class="text-primary focus:ring-primary" checked>
+                                <span>旅游攻略</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200">
+                                <input type="radio" name="shareType" value="照片" class="text-primary focus:ring-primary">
+                                <span>旅行照片</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200">
+                                <input type="radio" name="shareType" value="游记" class="text-primary focus:ring-primary">
+                                <span>旅行游记</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">标题</label>
+                        <input type="text" id="publishTitle" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200" placeholder="请输入分享标题">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">内容</label>
+                        <textarea id="publishContent" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200" placeholder="分享你的旅行故事..."></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">上传图片</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors duration-200">
+                            <input type="file" id="publishImage" class="hidden" multiple accept="image/*">
+                            <label for="publishImage" class="cursor-pointer">
+                                <i class="fa fa-cloud-upload text-3xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600">点击上传图片或拖拽到此处</p>
+                                <p class="text-sm text-gray-500 mt-1">支持JPG、PNG格式，最多上传9张</p>
+                            </label>
+                        </div>
+                        
+                        <!-- 图片预览 -->
+                        <div id="imagePreview" class="grid grid-cols-3 gap-2 mt-4 hidden">
+                            <!-- 图片预览将动态生成 -->
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">选择省份</label>
+                        <select id="publishProvince" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200">
+                            <option value="">请选择旅行省份</option>
+                            <option value="北京市">北京市</option>
+                            <option value="天津市">天津市</option>
+                            <option value="河北省">河北省</option>
+                            <option value="山西省">山西省</option>
+                            <option value="内蒙古自治区">内蒙古自治区</option>
+                            <option value="辽宁省">辽宁省</option>
+                            <option value="吉林省">吉林省</option>
+                            <option value="黑龙江省">黑龙江省</option>
+                            <option value="上海市">上海市</option>
+                            <option value="江苏省">江苏省</option>
+                            <option value="浙江省">浙江省</option>
+                            <option value="安徽省">安徽省</option>
+                            <option value="福建省">福建省</option>
+                            <option value="江西省">江西省</option>
+                            <option value="山东省">山东省</option>
+                            <option value="河南省">河南省</option>
+                            <option value="湖北省">湖北省</option>
+                            <option value="湖南省">湖南省</option>
+                            <option value="广东省">广东省</option>
+                            <option value="广西壮族自治区">广西壮族自治区</option>
+                            <option value="海南省">海南省</option>
+                            <option value="重庆市">重庆市</option>
+                            <option value="四川省">四川省</option>
+                            <option value="贵州省">贵州省</option>
+                            <option value="云南省">云南省</option>
+                            <option value="西藏自治区">西藏自治区</option>
+                            <option value="陕西省">陕西省</option>
+                            <option value="甘肃省">甘肃省</option>
+                            <option value="青海省">青海省</option>
+                            <option value="宁夏回族自治区">宁夏回族自治区</option>
+                            <option value="新疆维吾尔自治区">新疆维吾尔自治区</option>
+                            <option value="香港特别行政区">香港特别行政区</option>
+                            <option value="澳门特别行政区">澳门特别行政区</option>
+                            <option value="台湾省">台湾省</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex space-x-4">
+                        <button type="button" id="saveDraft" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors duration-200">
+                            保存草稿
+                        </button>
+                        <button type="submit" class="flex-1 bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition-colors duration-200">
+                            发布分享
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase配置 - 已替换为你的实际配置
+        const SUPABASE_URL = 'https://wdncyjjunekqxqmdqcka.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkbmN5anV1bmVrcXhxbWRxY2thIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MTUyNjgsImV4cCI6MjA4ODA5MTI2OH0.tdSfWnQtVsaBpJFzsofkJndhdTXjhuuHF3SPezVLOZA';
+
+        // 初始化Supabase客户端
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 全局变量
+        let currentUser = null;
+        let visitedProvinces = [];
+        let uploadedImages = [];
+
+        // 中国地图数据
+        const provinces = [
+            '北京市', '天津市', '河北省', '山西省', '内蒙古自治区',
+            '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省',
+            '浙江省', '安徽省', '福建省', '江西省', '山东省',
+            '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区',
+            '海南省', '重庆市', '四川省', '贵州省', '云南省',
+            '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区',
+            '新疆维吾尔自治区', '香港特别行政区', '澳门特别行政区', '台湾省'
+        ];
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            initEventListeners();
+            checkLoginStatus();
+        });
+
+        // 初始化地图
+        function initMap() {
+            const chartDom = document.getElementById('chinaMap');
+            const myChart = echarts.init(chartDom);
+            
+            // 地图配置
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        const isVisited = visitedProvinces.includes(params.name);
+                        return `${params.name}<br/>${isVisited ? '✓ 已访问' : '× 未访问'}`;
+                    }
+                },
+                series: [
+                    {
+                        name: '中国地图',
+                        type: 'map',
+                        map: 'china',
+                        roam: true,
+                        zoom: 1.2,
+                        center: [116.4074, 39.9042],
+                        label: {
+                            show: true,
+                            fontSize: 10,
+                            color: '#333'
+                        },
+                        emphasis: {
+                            label: {
+                                color: '#fff'
+                            },
+                            itemStyle: {
+                                areaColor: '#165DFF'
+                            }
+                        },
+                        data: provinces.map(province => ({
+                            name: province,
+                            value: visitedProvinces.includes(province) ? 1 : 0,
+                            itemStyle: {
+                                areaColor: visitedProvinces.includes(province) ? '#165DFF' : '#E0E6F1'
+                            }
+                        }))
+                    }
+                ]
+            };
+            
+            // 渲染地图
+            myChart.setOption(option);
+            
+            // 地图点击事件
+            myChart.on('click', function(params) {
+                toggleProvince(params.name);
+            });
+            
+            // 窗口大小变化时自适应
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+            
+            // 保存地图实例
+            window.chinaMapInstance = myChart;
+        }
+
+        // 检查登录状态
+        async function checkLoginStatus() {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            
+            if (user) {
+                currentUser = user;
+                // 获取用户详细信息
+                await fetchUserProfile();
+                // 获取用户足迹
+                await fetchUserFootprints();
+                // 获取用户分享
+                await fetchUserShares();
+                // 更新UI
+                updateUIForLoggedInUser();
+            } else {
+                currentUser = null;
+                visitedProvinces = [];
+                updateUIForLoggedOutUser();
+            }
+        }
+
+        // 获取用户资料
+        async function fetchUserProfile() {
+            if (!currentUser) return;
+            
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', currentUser.id)
+                .single();
+            
+            if (data) {
+                currentUser.profile = data;
+                updateUserProfileUI();
+            } else if (error && error.code === 'PGRST116') {
+                // 用户资料不存在，创建新资料
+                await createUserProfile();
+            }
+        }
+
+        // 创建用户资料
+        async function createUserProfile() {
+            if (!currentUser) return;
+            
+            const { data, error } = await supabase
+                .from('users')
+                .insert({
+                    id: currentUser.id,
+                    email: currentUser.email,
+                    name: currentUser.email.split('@')[0]
+                })
+                .single();
+            
+            if (data) {
+                currentUser.profile = data;
+                updateUserProfileUI();
+            }
+        }
+
+        // 获取用户足迹
+        async function fetchUserFootprints() {
+            if (!currentUser) return;
+            
+            const { data, error } = await supabase
+                .from('travel_footprints')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('visited_at', { ascending: false });
+            
+            if (data) {
+                visitedProvinces = data.map(item => item.province);
+                updateStats();
+                updateRecentVisited();
+                updateMap();
+            }
+        }
+
+        // 获取用户分享
+        async function fetchUserShares() {
+            if (!currentUser) return;
+            
+            const { data, error } = await supabase
+                .from('travel_shares')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+            
+            if (data) {
+                updateUserSharesGrid(data);
+            }
+        }
+
+        // 切换省份访问状态
+        async function toggleProvince(province) {
+            if (!currentUser) {
+                showToast('请先登录');
+                document.getElementById('loginBtn').click();
+                return;
+            }
+            
+            const index = visitedProvinces.indexOf(province);
+            
+            try {
+                if (index > -1) {
+                    // 移除已访问
+                    const { error } = await supabase
+                        .from('travel_footprints')
+                        .delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('province', province);
+                    
+                    if (!error) {
+                        visitedProvinces.splice(index, 1);
+                        showToast(`${province}已取消标记`);
+                    }
+                } else {
+                    // 添加已访问
+                    const { data, error } = await supabase
+                        .from('travel_footprints')
+                        .insert({
+                            user_id: currentUser.id,
+                            province: province
+                        })
+                        .single();
+                    
+                    if (data) {
+                        visitedProvinces.push(province);
+                        showToast(`${province}已标记为已访问`);
+                    }
+                }
+                
+                // 更新地图和统计
+                updateMap();
+                updateStats();
+                updateRecentVisited();
+                
+            } catch (error) {
+                showToast('操作失败，请重试');
+                console.error('Toggle province error:', error);
+            }
+        }
+
+        // 发布旅行分享
+        async function publishShare(title, content, shareType, province, images = []) {
+            if (!currentUser) {
+                showToast('请先登录');
+                return false;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('travel_shares')
+                    .insert({
+                        user_id: currentUser.id,
+                        title: title,
+                        content: content,
+                        share_type: shareType,
+                        province: province,
+                        images: images
+                    })
+                    .single();
+                
+                if (data) {
+                    showToast('发布成功！');
+                    // 刷新分享列表
+                    await fetchUserShares();
+                    return true;
+                } else if (error) {
+                    showToast('发布失败：' + error.message);
+                    return false;
+                }
+            } catch (error) {
+                showToast('发布失败，请重试');
+                console.error('Publish share error:', error);
+                return false;
+            }
+        }
+
+        // 更新地图
+        function updateMap() {
+            const myChart = window.chinaMapInstance;
+            const option = myChart.getOption();
+            
+            // 更新数据
+            option.series[0].data = provinces.map(province => ({
+                name: province,
+                value: visitedProvinces.includes(province) ? 1 : 0,
+                itemStyle: {
+                    areaColor: visitedProvinces.includes(province) ? '#165DFF' : '#E0E6F1'
+                }
+            }));
+            
+            myChart.setOption(option);
+        }
+
+        // 更新统计数据
+        function updateStats() {
+            const count = visitedProvinces.length;
+            const percentage = (count / 34) * 100;
+            
+            // 更新首页统计
+            document.getElementById('visitedCount').textContent = count;
+            
+            // 更新地图侧边栏统计
+            document.getElementById('visitedProvinces').textContent = `${count} / 34`;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+            
+            // 更新个人中心统计
+            document.getElementById('userVisitedCount').textContent = count;
+            document.getElementById('totalProvinces').textContent = count;
+            
+            // 模拟旅行天数（每个省份平均3天）
+            const travelDays = count * 3;
+            document.getElementById('travelDays').textContent = travelDays;
+            document.getElementById('totalDays').textContent = travelDays;
+            
+            // 模拟分享数量
+            const shareCount = Math.floor(count * 1.5);
+            document.getElementById('shareCount').textContent = shareCount;
+            document.getElementById('userShareCount').textContent = shareCount;
+            document.getElementById('totalPhotos').textContent = shareCount * 5;
+        }
+
+        // 更新最近访问列表
+        function updateRecentVisited() {
+            const recentVisited = document.getElementById('recentVisited');
+            
+            if (visitedProvinces.length === 0) {
+                recentVisited.innerHTML = '<p class="text-gray-500 text-center py-4">暂无访问记录</p>';
+                return;
+            }
+            
+            // 最近访问的5个省份
+            const recent = visitedProvinces.slice(0, 5);
+            
+            recentVisited.innerHTML = recent.map(province => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-800">${province}</span>
+                    <button onclick="toggleProvince('${province}')" class="text-red-500 hover:text-red-600 transition-colors duration-200">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // 更新用户分享网格
+        function updateUserSharesGrid(shares) {
+            const myShares = document.getElementById('myShares');
+            
+            if (shares.length === 0) {
+                myShares.innerHTML = '<p class="text-gray-500 text-center py-8">你还没有分享任何内容，快去发布你的旅行故事吧！</p>';
+                return;
+            }
+            
+            myShares.innerHTML = shares.map(share => `
+                <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <img src="${share.images.length > 0 ? share.images[0] : 'https://via.placeholder.com/100'}" alt="${share.title}" class="w-16 h-16 rounded-lg object-cover">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-800">${share.title}</h4>
+                        <p class="text-sm text-gray-600">${share.content.substring(0, 50)}...</p>
+                        <div class="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+                            <span>${share.share_type}</span>
+                            <span>${share.province}</span>
+                            <span>${new Date(share.created_at).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button class="text-gray-500 hover:text-primary transition-colors duration-200">
+                            <i class="fa fa-edit"></i>
+                        </button>
+                        <button class="text-gray-500 hover:text-red-500 transition-colors duration-200">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 更新已登录用户UI
+        function updateUIForLoggedInUser() {
+            // 更新登录按钮
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = `
+                <img src="${currentUser.profile?.avatar_url || 'https://via.placeholder.com/40'}" alt="用户头像" class="w-6 h-6 rounded-full">
+                <span>${currentUser.profile?.name || currentUser.email.split('@')[0]}</span>
+                <i class="fa fa-chevron-down"></i>
+            `;
+            loginBtn.classList.remove('bg-primary', 'text-white');
+            loginBtn.classList.add('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
+            
+            // 显示个人中心内容
+            document.getElementById('notLoggedInProfile').classList.add('hidden');
+            document.getElementById('loggedInProfile').classList.remove('hidden');
+            document.getElementById('loggedInProfile').classList.remove('col-span-full');
+        }
+
+        // 更新未登录用户UI
+        function updateUIForLoggedOutUser() {
+            // 更新登录按钮
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = `
+                <i class="fa fa-user"></i>
+                <span>登录</span>
+            `;
+            loginBtn.classList.remove('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
+            loginBtn.classList.add('bg-primary', 'text-white', 'hover:bg-primary/90');
+            
+            // 显示未登录状态
+            document.getElementById('notLoggedInProfile').classList.remove('hidden');
+            document.getElementById('notLoggedInProfile').classList.add('col-span-full');
+            document.getElementById('loggedInProfile').classList.add('hidden');
+        }
+
+        // 更新用户资料UI
+        function updateUserProfileUI() {
+            if (!currentUser?.profile) return;
+            
+            document.getElementById('userName').textContent = currentUser.profile.name;
+            document.getElementById('userAvatar').src = currentUser.profile.avatar_url || 'https://via.placeholder.com/120';
+        }
+
+        // 初始化事件监听器
+        function initEventListeners() {
+            // 导航栏滚动效果
+            window.addEventListener('scroll', function() {
+                const navbar = document.getElementById('navbar');
+                if (window.scrollY > 50) {
+                    navbar.classList.add('bg-white/95');
+                    navbar.classList.remove('bg-white/90');
+                } else {
+                    navbar.classList.add('bg-white/90');
+                    navbar.classList.remove('bg-white/95');
+                }
+            });
+            
+            // 移动端菜单
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
+            
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+            });
+            
+            // 用户菜单下拉
+            const userMenu = document.getElementById('userMenu');
+            const userDropdown = document.getElementById('userDropdown');
+            
+            userMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+                userDropdown.classList.toggle('hidden');
+            });
+            
+            // 点击其他地方关闭下拉菜单
+            document.addEventListener('click', function() {
+                userDropdown.classList.add('hidden');
+            });
+            
+            // 登录按钮
+            const loginBtn = document.getElementById('loginBtn');
+            const loginModal = document.getElementById('loginModal');
+            const modalContent = document.getElementById('modalContent');
+            const closeModal = document.getElementById('closeModal');
+            
+            loginBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (currentUser) return;
+                
+                loginModal.classList.remove('hidden');
+                setTimeout(() => {
+                    modalContent.classList.remove('scale-95', 'opacity-0');
+                    modalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+            
+            closeModal.addEventListener('click', function() {
+                modalContent.classList.remove('scale-100', 'opacity-100');
+                modalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    loginModal.classList.add('hidden');
+                }, 300);
+            });
+            
+            // 登录方式
+            const emailLoginBtn = document.getElementById('emailLoginBtn');
+            const githubLoginBtn = document.getElementById('githubLoginBtn');
+            const googleLoginBtn = document.getElementById('googleLoginBtn');
+            
+            emailLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOtp({
+                        email: prompt('请输入你的邮箱'),
+                        options: {
+                            emailRedirectTo: window.location.origin
+                        }
+                    });
+                    
+                    if (data) {
+                        showToast('登录链接已发送到你的邮箱');
+                        closeModal.click();
+                    }
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
+            
+            githubLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOAuth({
+                        provider: 'github',
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
+            
+            googleLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
+            
+            // 退出登录
+            const logoutBtn = document.getElementById('logoutBtn');
+            logoutBtn.addEventListener('click', async function() {
+                try {
+                    const { error } = await supabase.auth.signOut();
+                    if (!error) {
+                        currentUser = null;
+                        visitedProvinces = [];
+                        updateUIForLoggedOutUser();
+                        updateStats();
+                        updateRecentVisited();
+                        updateMap();
+                        showToast('已退出登录');
+                    }
+                } catch (error) {
+                    showToast('退出失败：' + error.message);
+                }
+            });
+            
+            // 分享筛选
+            const filterBtns = document.querySelectorAll('.share-filter-btn');
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 更新按钮状态
+                    filterBtns.forEach(b => {
+                        b.classList.remove('active', 'bg-primary', 'text-white');
+                        b.classList.add('bg-white', 'text-gray-700');
+                    });
+                    this.classList.add('active', 'bg-primary', 'text-white');
+                    this.classList.remove('bg-white', 'text-gray-700');
+                    
+                    // 这里可以添加筛选逻辑
+                    showToast(`已切换到${this.textContent}分类`);
+                });
+            });
+            
+            // 发布按钮
+            const publishBtn = document.getElementById('publishBtn');
+            const publishModal = document.getElementById('publishModal');
+            const publishModalContent = document.getElementById('publishModalContent');
+            const closePublishModal = document.getElementById('closePublishModal');
+            
+            publishBtn.addEventListener('click', function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    loginBtn.click();
+                    return;
+                }
+                
+                publishModal.classList.remove('hidden');
+                setTimeout(() => {
+                    publishModalContent.classList.remove('scale-95', 'opacity-0');
+                    publishModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+            
+            closePublishModal.addEventListener('click', function() {
+                publishModalContent.classList.remove('scale-100', 'opacity-100');
+                publishModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    publishModal.classList.add('hidden');
+                }, 300);
+            });
+            
+            // 发布表单提交
+            const publishForm = document.getElementById('publishForm');
+            publishForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const title = document.getElementById('publishTitle').value;
+                const content = document.getElementById('publishContent').value;
+                const province = document.getElementById('publishProvince').value;
+                const shareType = document.querySelector('input[name="shareType"]:checked')?.value;
+                
+                if (!title || !content || !province || !shareType) {
+                    showToast('请填写完整信息');
+                    return;
+                }
+                
+                // 发布分享
+                const success = await publishShare(title, content, shareType, province, uploadedImages);
+                
+                if (success) {
+                    closePublishModal.click();
+                    // 重置表单
+                    publishForm.reset();
+                    uploadedImages = [];
+                    document.getElementById('imagePreview').classList.add('hidden');
+                }
+            });
+            
+            // 图片上传预览
+            const publishImage = document.getElementById('publishImage');
+            const imagePreview = document.getElementById('imagePreview');
+            
+            publishImage.addEventListener('change', function(e) {
+                const files = e.target.files;
+                uploadedImages = [];
+                
+                if (files.length > 0) {
+                    imagePreview.innerHTML = '';
+                    imagePreview.classList.remove('hidden');
+                    
+                    Array.from(files).forEach((file, index) => {
+                        if (index >= 9) return; // 最多9张图片
+                        
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            uploadedImages.push(event.target.result);
+                            
+                            const previewItem = document.createElement('div');
+                            previewItem.className = 'relative';
+                            previewItem.innerHTML = `
+                                <img src="${event.target.result}" alt="预览" class="w-full h-24 object-cover rounded-lg">
+                                <button onclick="removePreviewImage(${index})" class="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors duration-200">
+                                    <i class="fa fa-times text-xs"></i>
+                                </button>
+                            `;
+                            imagePreview.appendChild(previewItem);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+            });
+            
+            // 清除所有标记
+            const clearAllBtn = document.getElementById('clearAll');
+            clearAllBtn.addEventListener('click', async function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    return;
+                }
+                
+                if (confirm('确定要清除所有标记吗？')) {
+                    try {
+                        const { error } = await supabase
+                            .from('travel_footprints')
+                            .delete()
+                            .eq('user_id', currentUser.id);
+                        
+                        if (!error) {
+                            visitedProvinces = [];
+                            updateMap();
+                            updateStats();
+                            updateRecentVisited();
+                            showToast('所有标记已清除');
+                        }
+                    } catch (error) {
+                        showToast('操作失败：' + error.message);
+                    }
+                }
+            });
+            
+            // 导出地图
+            const exportMapBtn = document.getElementById('exportMap');
+            exportMapBtn.addEventListener('click', function() {
+                const myChart = window.chinaMapInstance;
+                const imgData = myChart.getDataURL({
+                    type: 'png',
+                    pixelRatio: 2,
+                    backgroundColor: '#fff'
+                });
+                
+                const link = document.createElement('a');
+                link.href = imgData;
+                link.download = '我的旅行足迹.png';
+                link.click();
+                
+                showToast('地图导出成功');
+            });
+            
+            // 分享地图
+            const shareMapBtn = document.getElementById('shareMap');
+            shareMapBtn.addEventListener('click', function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    loginBtn.click();
+                    return;
+                }
+                
+                showToast('分享功能开发中，敬请期待');
+            });
+            
+            // 加载更多分享
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            loadMoreBtn.addEventListener('click', function() {
+                showToast('已加载全部内容');
+            });
+            
+            // 个人中心登录按钮
+            const loginFromProfileBtn = document.getElementById('loginFromProfileBtn');
+            loginFromProfileBtn.addEventListener('click', function() {
+                loginBtn.click();
+            });
+            
+            // 开始标记按钮
+            const startMarkingBtn = document.getElementById('startMarkingBtn');
+            startMarkingBtn.addEventListener('click', function() {
+                document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
+            });
+            
+            // 查看分享按钮
+            const viewSharesBtn = document.getElementById('viewSharesBtn');
+            viewSharesBtn.addEventListener('click', function() {
+                document.getElementById('share').scrollIntoView({ behavior: 'smooth' });
+            });
+            
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        }
+
+        // 移除预览图片
+        function removePreviewImage(index) {
+            uploadedImages.splice(index, 1);
+            const previewItems = document.querySelectorAll('#imagePreview > div');
+            previewItems[index].remove();
+            
+            if (uploadedImages.length === 0) {
+                document.getElementById('imagePreview').classList.add('hidden');
+            }
+        }
+
+        // 显示提示
+        function showToast(message) {
+            // 创建提示元素
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-20 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300';
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // 显示提示
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 10);
+            
+            // 隐藏提示
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
+        // 监听Auth状态变化
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                currentUser = session.user;
+                await fetchUserProfile();
+                await fetchUserFootprints();
+                await fetchUserShares();
+                updateUIForLoggedInUser();
+                showToast('登录成功！');
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                visitedProvinces = [];
+                updateUIForLoggedOutUser();
+                updateStats();
+                updateRecentVisited();
+                updateMap();
+                showToast('已退出登录');
+            }
+        });
+    </script>
+</body>
+</html>
