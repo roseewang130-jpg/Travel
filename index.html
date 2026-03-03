@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/v4-shims.min.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     
     <script>
@@ -759,15 +760,17 @@
     </div>
 
     <script>
+        // Supabase配置 - 请替换为你的实际配置
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+        // 初始化Supabase客户端
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // 全局变量
-        let supabase = null;
         let currentUser = null;
         let visitedProvinces = [];
         let uploadedImages = [];
-
-        // Supabase配置 - 请替换为你的实际配置
-        const SUPABASE_URL = 'https://wdncyjjunekqxqmdqcka.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkbmN5anV1bmVrcXhxbWRxY2thIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MTUyNjgsImV4cCI6MjA4ODA5MTI2OH0.tdSfWnQtVsaBpJFzsofkJndhdTXjhuuHF3SPezVLOZA';
 
         // 中国地图数据
         const provinces = [
@@ -782,20 +785,6 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
-            // 初始化Supabase客户端
-            try {
-                if (window.supabase && window.supabase.createClient) {
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('Supabase初始化成功');
-                } else {
-                    console.error('Supabase SDK未加载');
-                    showToast('核心库加载失败，请刷新页面重试');
-                }
-            } catch (error) {
-                console.error('Supabase初始化失败:', error);
-                showToast('Supabase初始化失败，请检查配置');
-            }
-            
             initMap();
             initEventListeners();
             checkLoginStatus();
@@ -804,11 +793,6 @@
         // 初始化地图
         function initMap() {
             const chartDom = document.getElementById('chinaMap');
-            if (!chartDom) {
-                console.error('地图容器未找到');
-                return;
-            }
-            
             const myChart = echarts.init(chartDom);
             
             // 地图配置
@@ -871,125 +855,99 @@
 
         // 检查登录状态
         async function checkLoginStatus() {
-            if (!supabase) {
-                console.error('Supabase未初始化');
-                return;
-            }
+            const { data: { user }, error } = await supabase.auth.getUser();
             
-            try {
-                const { data: { user }, error } = await supabase.auth.getUser();
-                
-                if (user) {
-                    currentUser = user;
-                    // 获取用户详细信息
-                    await fetchUserProfile();
-                    // 获取用户足迹
-                    await fetchUserFootprints();
-                    // 获取用户分享
-                    await fetchUserShares();
-                    // 更新UI
-                    updateUIForLoggedInUser();
-                } else {
-                    currentUser = null;
-                    visitedProvinces = [];
-                    updateUIForLoggedOutUser();
-                }
-            } catch (error) {
-                console.error('检查登录状态失败:', error);
-                showToast('检查登录状态失败，请刷新页面重试');
+            if (user) {
+                currentUser = user;
+                // 获取用户详细信息
+                await fetchUserProfile();
+                // 获取用户足迹
+                await fetchUserFootprints();
+                // 获取用户分享
+                await fetchUserShares();
+                // 更新UI
+                updateUIForLoggedInUser();
+            } else {
+                currentUser = null;
+                visitedProvinces = [];
+                updateUIForLoggedOutUser();
             }
         }
 
         // 获取用户资料
         async function fetchUserProfile() {
-            if (!currentUser || !supabase) return;
+            if (!currentUser) return;
             
-            try {
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', currentUser.id)
-                    .single();
-                
-                if (data) {
-                    currentUser.profile = data;
-                    updateUserProfileUI();
-                } else if (error && error.code === 'PGRST116') {
-                    // 用户资料不存在，创建新资料
-                    await createUserProfile();
-                }
-            } catch (error) {
-                console.error('获取用户资料失败:', error);
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', currentUser.id)
+                .single();
+            
+            if (data) {
+                currentUser.profile = data;
+                updateUserProfileUI();
+            } else if (error && error.code === 'PGRST116') {
+                // 用户资料不存在，创建新资料
+                await createUserProfile();
             }
         }
 
         // 创建用户资料
         async function createUserProfile() {
-            if (!currentUser || !supabase) return;
+            if (!currentUser) return;
             
-            try {
-                const { data, error } = await supabase
-                    .from('users')
-                    .insert({
-                        id: currentUser.id,
-                        email: currentUser.email,
-                        name: currentUser.email.split('@')[0]
-                    })
-                    .single();
-                
-                if (data) {
-                    currentUser.profile = data;
-                    updateUserProfileUI();
-                }
-            } catch (error) {
-                console.error('创建用户资料失败:', error);
+            const { data, error } = await supabase
+                .from('users')
+                .insert({
+                    id: currentUser.id,
+                    email: currentUser.email,
+                    name: currentUser.email.split('@')[0]
+                })
+                .single();
+            
+            if (data) {
+                currentUser.profile = data;
+                updateUserProfileUI();
             }
         }
 
         // 获取用户足迹
         async function fetchUserFootprints() {
-            if (!currentUser || !supabase) return;
+            if (!currentUser) return;
             
-            try {
-                const { data, error } = await supabase
-                    .from('travel_footprints')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('visited_at', { ascending: false });
-                
-                if (data) {
-                    visitedProvinces = data.map(item => item.province);
-                    updateStats();
-                    updateRecentVisited();
-                    updateMap();
-                }
-            } catch (error) {
-                console.error('获取用户足迹失败:', error);
+            const { data, error } = await supabase
+                .from('travel_footprints')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('visited_at', { ascending: false });
+            
+            if (data) {
+                visitedProvinces = data.map(item => item.province);
+                updateStats();
+                updateRecentVisited();
+                updateMap();
             }
         }
 
         // 获取用户分享
         async function fetchUserShares() {
-            if (!currentUser || !supabase) return;
+            if (!currentUser) return;
             
-            try {
-                const { data, error } = await supabase
-                    .from('travel_shares')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('created_at', { ascending: false });
-                
-                if (data) {
-                    updateUserSharesGrid(data);
-                }
-            } catch (error) {
-                console.error('获取用户分享失败:', error);
+            const { data, error } = await supabase
+                .from('travel_shares')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+            
+            if (data) {
+                updateUserSharesGrid(data);
             }
         }
 
         // 切换省份访问状态
         async function toggleProvince(province) {
-            if (!currentUser || !supabase) {
+            if (!currentUser) {
                 showToast('请先登录');
                 document.getElementById('loginBtn').click();
                 return;
@@ -1039,7 +997,7 @@
 
         // 发布旅行分享
         async function publishShare(title, content, shareType, province, images = []) {
-            if (!currentUser || !supabase) {
+            if (!currentUser) {
                 showToast('请先登录');
                 return false;
             }
@@ -1076,8 +1034,6 @@
         // 更新地图
         function updateMap() {
             const myChart = window.chinaMapInstance;
-            if (!myChart) return;
-            
             const option = myChart.getOption();
             
             // 更新数据
@@ -1098,72 +1054,41 @@
             const percentage = (count / 34) * 100;
             
             // 更新首页统计
-            const visitedCountEl = document.getElementById('visitedCount');
-            if (visitedCountEl) {
-                visitedCountEl.textContent = count;
-            }
+            document.getElementById('visitedCount').textContent = count;
             
             // 更新地图侧边栏统计
-            const visitedProvincesEl = document.getElementById('visitedProvinces');
-            const progressBarEl = document.getElementById('progressBar');
-            if (visitedProvincesEl) {
-                visitedProvincesEl.textContent = `${count} / 34`;
-            }
-            if (progressBarEl) {
-                progressBarEl.style.width = `${percentage}%`;
-            }
+            document.getElementById('visitedProvinces').textContent = `${count} / 34`;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
             
             // 更新个人中心统计
-            const userVisitedCountEl = document.getElementById('userVisitedCount');
-            const totalProvincesEl = document.getElementById('totalProvinces');
-            if (userVisitedCountEl) {
-                userVisitedCountEl.textContent = count;
-            }
-            if (totalProvincesEl) {
-                totalProvincesEl.textContent = count;
-            }
+            document.getElementById('userVisitedCount').textContent = count;
+            document.getElementById('totalProvinces').textContent = count;
             
             // 模拟旅行天数（每个省份平均3天）
             const travelDays = count * 3;
-            const travelDaysEl = document.getElementById('travelDays');
-            const totalDaysEl = document.getElementById('totalDays');
-            if (travelDaysEl) {
-                travelDaysEl.textContent = travelDays;
-            }
-            if (totalDaysEl) {
-                totalDaysEl.textContent = travelDays;
-            }
+            document.getElementById('travelDays').textContent = travelDays;
+            document.getElementById('totalDays').textContent = travelDays;
             
             // 模拟分享数量
             const shareCount = Math.floor(count * 1.5);
-            const shareCountEl = document.getElementById('shareCount');
-            const userShareCountEl = document.getElementById('userShareCount');
-            const totalPhotosEl = document.getElementById('totalPhotos');
-            if (shareCountEl) {
-                shareCountEl.textContent = shareCount;
-            }
-            if (userShareCountEl) {
-                userShareCountEl.textContent = shareCount;
-            }
-            if (totalPhotosEl) {
-                totalPhotosEl.textContent = shareCount * 5;
-            }
+            document.getElementById('shareCount').textContent = shareCount;
+            document.getElementById('userShareCount').textContent = shareCount;
+            document.getElementById('totalPhotos').textContent = shareCount * 5;
         }
 
         // 更新最近访问列表
         function updateRecentVisited() {
-            const recentVisitedEl = document.getElementById('recentVisited');
-            if (!recentVisitedEl) return;
+            const recentVisited = document.getElementById('recentVisited');
             
             if (visitedProvinces.length === 0) {
-                recentVisitedEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无访问记录</p>';
+                recentVisited.innerHTML = '<p class="text-gray-500 text-center py-4">暂无访问记录</p>';
                 return;
             }
             
             // 最近访问的5个省份
             const recent = visitedProvinces.slice(0, 5);
             
-            recentVisitedEl.innerHTML = recent.map(province => `
+            recentVisited.innerHTML = recent.map(province => `
                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span class="text-gray-800">${province}</span>
                     <button onclick="toggleProvince('${province}')" class="text-red-500 hover:text-red-600 transition-colors duration-200">
@@ -1175,15 +1100,14 @@
 
         // 更新用户分享网格
         function updateUserSharesGrid(shares) {
-            const mySharesEl = document.getElementById('myShares');
-            if (!mySharesEl) return;
+            const myShares = document.getElementById('myShares');
             
             if (shares.length === 0) {
-                mySharesEl.innerHTML = '<p class="text-gray-500 text-center py-8">你还没有分享任何内容，快去发布你的旅行故事吧！</p>';
+                myShares.innerHTML = '<p class="text-gray-500 text-center py-8">你还没有分享任何内容，快去发布你的旅行故事吧！</p>';
                 return;
             }
             
-            mySharesEl.innerHTML = shares.map(share => `
+            myShares.innerHTML = shares.map(share => `
                 <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                     <img src="${share.images.length > 0 ? share.images[0] : 'https://via.placeholder.com/100'}" alt="${share.title}" class="w-16 h-16 rounded-lg object-cover">
                     <div class="flex-1">
@@ -1210,240 +1134,174 @@
         // 更新已登录用户UI
         function updateUIForLoggedInUser() {
             // 更新登录按钮
-            const loginBtnEl = document.getElementById('loginBtn');
-            const notLoggedInProfileEl = document.getElementById('notLoggedInProfile');
-            const loggedInProfileEl = document.getElementById('loggedInProfile');
-            
-            if (loginBtnEl) {
-                loginBtnEl.innerHTML = `
-                    <img src="${currentUser.profile?.avatar_url || 'https://via.placeholder.com/40'}" alt="用户头像" class="w-6 h-6 rounded-full">
-                    <span>${currentUser.profile?.name || currentUser.email.split('@')[0]}</span>
-                    <i class="fa fa-chevron-down"></i>
-                `;
-                loginBtnEl.classList.remove('bg-primary', 'text-white');
-                loginBtnEl.classList.add('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
-            }
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = `
+                <img src="${currentUser.profile?.avatar_url || 'https://via.placeholder.com/40'}" alt="用户头像" class="w-6 h-6 rounded-full">
+                <span>${currentUser.profile?.name || currentUser.email.split('@')[0]}</span>
+                <i class="fa fa-chevron-down"></i>
+            `;
+            loginBtn.classList.remove('bg-primary', 'text-white');
+            loginBtn.classList.add('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
             
             // 显示个人中心内容
-            if (notLoggedInProfileEl) {
-                notLoggedInProfileEl.classList.add('hidden');
-            }
-            if (loggedInProfileEl) {
-                loggedInProfileEl.classList.remove('hidden');
-                loggedInProfileEl.classList.remove('col-span-full');
-            }
+            document.getElementById('notLoggedInProfile').classList.add('hidden');
+            document.getElementById('loggedInProfile').classList.remove('hidden');
+            document.getElementById('loggedInProfile').classList.remove('col-span-full');
         }
 
         // 更新未登录用户UI
         function updateUIForLoggedOutUser() {
             // 更新登录按钮
-            const loginBtnEl = document.getElementById('loginBtn');
-            const notLoggedInProfileEl = document.getElementById('notLoggedInProfile');
-            const loggedInProfileEl = document.getElementById('loggedInProfile');
-            
-            if (loginBtnEl) {
-                loginBtnEl.innerHTML = `
-                    <i class="fa fa-user"></i>
-                    <span>登录</span>
-                `;
-                loginBtnEl.classList.remove('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
-                loginBtnEl.classList.add('bg-primary', 'text-white', 'hover:bg-primary/90');
-            }
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = `
+                <i class="fa fa-user"></i>
+                <span>登录</span>
+            `;
+            loginBtn.classList.remove('bg-gray-100', 'text-gray-800', 'hover:bg-gray-200');
+            loginBtn.classList.add('bg-primary', 'text-white', 'hover:bg-primary/90');
             
             // 显示未登录状态
-            if (notLoggedInProfileEl) {
-                notLoggedInProfileEl.classList.remove('hidden');
-                notLoggedInProfileEl.classList.add('col-span-full');
-            }
-            if (loggedInProfileEl) {
-                loggedInProfileEl.classList.add('hidden');
-            }
+            document.getElementById('notLoggedInProfile').classList.remove('hidden');
+            document.getElementById('notLoggedInProfile').classList.add('col-span-full');
+            document.getElementById('loggedInProfile').classList.add('hidden');
         }
 
         // 更新用户资料UI
         function updateUserProfileUI() {
             if (!currentUser?.profile) return;
             
-            const userNameEl = document.getElementById('userName');
-            const userAvatarEl = document.getElementById('userAvatar');
-            
-            if (userNameEl) {
-                userNameEl.textContent = currentUser.profile.name;
-            }
-            if (userAvatarEl) {
-                userAvatarEl.src = currentUser.profile.avatar_url || 'https://via.placeholder.com/120';
-            }
+            document.getElementById('userName').textContent = currentUser.profile.name;
+            document.getElementById('userAvatar').src = currentUser.profile.avatar_url || 'https://via.placeholder.com/120';
         }
 
         // 初始化事件监听器
         function initEventListeners() {
             // 导航栏滚动效果
             window.addEventListener('scroll', function() {
-                const navbarEl = document.getElementById('navbar');
-                if (navbarEl) {
-                    if (window.scrollY > 50) {
-                        navbarEl.classList.add('bg-white/95');
-                        navbarEl.classList.remove('bg-white/90');
-                    } else {
-                        navbarEl.classList.add('bg-white/90');
-                        navbarEl.classList.remove('bg-white/95');
-                    }
+                const navbar = document.getElementById('navbar');
+                if (window.scrollY > 50) {
+                    navbar.classList.add('bg-white/95');
+                    navbar.classList.remove('bg-white/90');
+                } else {
+                    navbar.classList.add('bg-white/90');
+                    navbar.classList.remove('bg-white/95');
                 }
             });
             
             // 移动端菜单
-            const mobileMenuBtnEl = document.getElementById('mobileMenuBtn');
-            const mobileMenuEl = document.getElementById('mobileMenu');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
             
-            if (mobileMenuBtnEl && mobileMenuEl) {
-                mobileMenuBtnEl.addEventListener('click', function() {
-                    mobileMenuEl.classList.toggle('hidden');
-                });
-            }
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+            });
             
             // 用户菜单下拉
-            const userMenuEl = document.getElementById('userMenu');
-            const userDropdownEl = document.getElementById('userDropdown');
+            const userMenu = document.getElementById('userMenu');
+            const userDropdown = document.getElementById('userDropdown');
             
-            if (userMenuEl && userDropdownEl) {
-                userMenuEl.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    userDropdownEl.classList.toggle('hidden');
-                });
-                
-                // 点击其他地方关闭下拉菜单
-                document.addEventListener('click', function() {
-                    userDropdownEl.classList.add('hidden');
-                });
-            }
+            userMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+                userDropdown.classList.toggle('hidden');
+            });
+            
+            // 点击其他地方关闭下拉菜单
+            document.addEventListener('click', function() {
+                userDropdown.classList.add('hidden');
+            });
             
             // 登录按钮
-            const loginBtnEl = document.getElementById('loginBtn');
-            const loginModalEl = document.getElementById('loginModal');
-            const modalContentEl = document.getElementById('modalContent');
-            const closeModalEl = document.getElementById('closeModal');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginModal = document.getElementById('loginModal');
+            const modalContent = document.getElementById('modalContent');
+            const closeModal = document.getElementById('closeModal');
             
-            if (loginBtnEl && loginModalEl && modalContentEl) {
-                loginBtnEl.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    if (currentUser) return;
-                    
-                    loginModalEl.classList.remove('hidden');
-                    setTimeout(() => {
-                        modalContentEl.classList.remove('scale-95', 'opacity-0');
-                        modalContentEl.classList.add('scale-100', 'opacity-100');
-                    }, 10);
-                });
+            loginBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (currentUser) return;
                 
-                if (closeModalEl) {
-                    closeModalEl.addEventListener('click', function() {
-                        modalContentEl.classList.remove('scale-100', 'opacity-100');
-                        modalContentEl.classList.add('scale-95', 'opacity-0');
-                        setTimeout(() => {
-                            loginModalEl.classList.add('hidden');
-                        }, 300);
-                    });
-                }
-            }
+                loginModal.classList.remove('hidden');
+                setTimeout(() => {
+                    modalContent.classList.remove('scale-95', 'opacity-0');
+                    modalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+            
+            closeModal.addEventListener('click', function() {
+                modalContent.classList.remove('scale-100', 'opacity-100');
+                modalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    loginModal.classList.add('hidden');
+                }, 300);
+            });
             
             // 登录方式
-            const emailLoginBtnEl = document.getElementById('emailLoginBtn');
-            const githubLoginBtnEl = document.getElementById('githubLoginBtn');
-            const googleLoginBtnEl = document.getElementById('googleLoginBtn');
+            const emailLoginBtn = document.getElementById('emailLoginBtn');
+            const githubLoginBtn = document.getElementById('githubLoginBtn');
+            const googleLoginBtn = document.getElementById('googleLoginBtn');
             
-            if (emailLoginBtnEl) {
-                emailLoginBtnEl.addEventListener('click', async function() {
-                    if (!supabase) {
-                        showToast('Supabase未初始化，请刷新页面');
-                        return;
-                    }
-                    
-                    try {
-                        const email = prompt('请输入你的邮箱');
-                        if (!email) return;
-                        
-                        const { data, error } = await supabase.auth.signInWithOtp({
-                            email: email,
-                            options: {
-                                emailRedirectTo: window.location.origin
-                            }
-                        });
-                        
-                        if (data) {
-                            showToast('登录链接已发送到你的邮箱');
-                            if (closeModalEl) closeModalEl.click();
+            emailLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOtp({
+                        email: prompt('请输入你的邮箱'),
+                        options: {
+                            emailRedirectTo: window.location.origin
                         }
-                    } catch (error) {
-                        showToast('登录失败：' + error.message);
-                    }
-                });
-            }
-            
-            if (githubLoginBtnEl) {
-                githubLoginBtnEl.addEventListener('click', async function() {
-                    if (!supabase) {
-                        showToast('Supabase未初始化，请刷新页面');
-                        return;
-                    }
+                    });
                     
-                    try {
-                        const { data, error } = await supabase.auth.signInWithOAuth({
-                            provider: 'github',
-                            options: {
-                                redirectTo: window.location.origin
-                            }
-                        });
-                    } catch (error) {
-                        showToast('登录失败：' + error.message);
+                    if (data) {
+                        showToast('登录链接已发送到你的邮箱');
+                        closeModal.click();
                     }
-                });
-            }
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
             
-            if (googleLoginBtnEl) {
-                googleLoginBtnEl.addEventListener('click', async function() {
-                    if (!supabase) {
-                        showToast('Supabase未初始化，请刷新页面');
-                        return;
-                    }
-                    
-                    try {
-                        const { data, error } = await supabase.auth.signInWithOAuth({
-                            provider: 'google',
-                            options: {
-                                redirectTo: window.location.origin
-                            }
-                        });
-                    } catch (error) {
-                        showToast('登录失败：' + error.message);
-                    }
-                });
-            }
+            githubLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOAuth({
+                        provider: 'github',
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
+            
+            googleLoginBtn.addEventListener('click', async function() {
+                try {
+                    const { data, error } = await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+                } catch (error) {
+                    showToast('登录失败：' + error.message);
+                }
+            });
             
             // 退出登录
-            const logoutBtnEl = document.getElementById('logoutBtn');
-            if (logoutBtnEl) {
-                logoutBtnEl.addEventListener('click', async function() {
-                    if (!supabase) {
-                        showToast('Supabase未初始化，请刷新页面');
-                        return;
+            const logoutBtn = document.getElementById('logoutBtn');
+            logoutBtn.addEventListener('click', async function() {
+                try {
+                    const { error } = await supabase.auth.signOut();
+                    if (!error) {
+                        currentUser = null;
+                        visitedProvinces = [];
+                        updateUIForLoggedOutUser();
+                        updateStats();
+                        updateRecentVisited();
+                        updateMap();
+                        showToast('已退出登录');
                     }
-                    
-                    try {
-                        const { error } = await supabase.auth.signOut();
-                        if (!error) {
-                            currentUser = null;
-                            visitedProvinces = [];
-                            updateUIForLoggedOutUser();
-                            updateStats();
-                            updateRecentVisited();
-                            updateMap();
-                            showToast('已退出登录');
-                        }
-                    } catch (error) {
-                        showToast('退出失败：' + error.message);
-                    }
-                });
-            }
+                } catch (error) {
+                    showToast('退出失败：' + error.message);
+                }
+            });
             
             // 分享筛选
             const filterBtns = document.querySelectorAll('.share-filter-btn');
@@ -1463,221 +1321,175 @@
             });
             
             // 发布按钮
-            const publishBtnEl = document.getElementById('publishBtn');
-            const publishModalEl = document.getElementById('publishModal');
-            const publishModalContentEl = document.getElementById('publishModalContent');
-            const closePublishModalEl = document.getElementById('closePublishModal');
+            const publishBtn = document.getElementById('publishBtn');
+            const publishModal = document.getElementById('publishModal');
+            const publishModalContent = document.getElementById('publishModalContent');
+            const closePublishModal = document.getElementById('closePublishModal');
             
-            if (publishBtnEl && publishModalEl && publishModalContentEl) {
-                publishBtnEl.addEventListener('click', function() {
-                    if (!currentUser) {
-                        showToast('请先登录');
-                        if (loginBtnEl) loginBtnEl.click();
-                        return;
-                    }
-                    
-                    publishModalEl.classList.remove('hidden');
-                    setTimeout(() => {
-                        publishModalContentEl.classList.remove('scale-95', 'opacity-0');
-                        publishModalContentEl.classList.add('scale-100', 'opacity-100');
-                    }, 10);
-                });
-                
-                if (closePublishModalEl) {
-                    closePublishModalEl.addEventListener('click', function() {
-                        publishModalContentEl.classList.remove('scale-100', 'opacity-100');
-                        publishModalContentEl.classList.add('scale-95', 'opacity-0');
-                        setTimeout(() => {
-                            publishModalEl.classList.add('hidden');
-                        }, 300);
-                    });
+            publishBtn.addEventListener('click', function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    loginBtn.click();
+                    return;
                 }
-            }
+                
+                publishModal.classList.remove('hidden');
+                setTimeout(() => {
+                    publishModalContent.classList.remove('scale-95', 'opacity-0');
+                    publishModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+            
+            closePublishModal.addEventListener('click', function() {
+                publishModalContent.classList.remove('scale-100', 'opacity-100');
+                publishModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    publishModal.classList.add('hidden');
+                }, 300);
+            });
             
             // 发布表单提交
-            const publishFormEl = document.getElementById('publishForm');
-            if (publishFormEl) {
-                publishFormEl.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    const titleEl = document.getElementById('publishTitle');
-                    const contentEl = document.getElementById('publishContent');
-                    const provinceEl = document.getElementById('publishProvince');
-                    const shareTypeEl = document.querySelector('input[name="shareType"]:checked');
-                    
-                    if (!titleEl || !contentEl || !provinceEl || !shareTypeEl) {
-                        showToast('表单元素未找到');
-                        return;
-                    }
-                    
-                    const title = titleEl.value;
-                    const content = contentEl.value;
-                    const province = provinceEl.value;
-                    const shareType = shareTypeEl.value;
-                    
-                    if (!title || !content || !province || !shareType) {
-                        showToast('请填写完整信息');
-                        return;
-                    }
-                    
-                    // 发布分享
-                    const success = await publishShare(title, content, shareType, province, uploadedImages);
-                    
-                    if (success) {
-                        if (closePublishModalEl) closePublishModalEl.click();
-                        // 重置表单
-                        publishFormEl.reset();
-                        uploadedImages = [];
-                        const imagePreviewEl = document.getElementById('imagePreview');
-                        if (imagePreviewEl) {
-                            imagePreviewEl.classList.add('hidden');
-                        }
-                    }
-                });
-            }
+            const publishForm = document.getElementById('publishForm');
+            publishForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const title = document.getElementById('publishTitle').value;
+                const content = document.getElementById('publishContent').value;
+                const province = document.getElementById('publishProvince').value;
+                const shareType = document.querySelector('input[name="shareType"]:checked')?.value;
+                
+                if (!title || !content || !province || !shareType) {
+                    showToast('请填写完整信息');
+                    return;
+                }
+                
+                // 发布分享
+                const success = await publishShare(title, content, shareType, province, uploadedImages);
+                
+                if (success) {
+                    closePublishModal.click();
+                    // 重置表单
+                    publishForm.reset();
+                    uploadedImages = [];
+                    document.getElementById('imagePreview').classList.add('hidden');
+                }
+            });
             
             // 图片上传预览
-            const publishImageEl = document.getElementById('publishImage');
-            const imagePreviewEl = document.getElementById('imagePreview');
+            const publishImage = document.getElementById('publishImage');
+            const imagePreview = document.getElementById('imagePreview');
             
-            if (publishImageEl && imagePreviewEl) {
-                publishImageEl.addEventListener('change', function(e) {
-                    const files = e.target.files;
-                    uploadedImages = [];
+            publishImage.addEventListener('change', function(e) {
+                const files = e.target.files;
+                uploadedImages = [];
+                
+                if (files.length > 0) {
+                    imagePreview.innerHTML = '';
+                    imagePreview.classList.remove('hidden');
                     
-                    if (files.length > 0) {
-                        imagePreviewEl.innerHTML = '';
-                        imagePreviewEl.classList.remove('hidden');
+                    Array.from(files).forEach((file, index) => {
+                        if (index >= 9) return; // 最多9张图片
                         
-                        Array.from(files).forEach((file, index) => {
-                            if (index >= 9) return; // 最多9张图片
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            uploadedImages.push(event.target.result);
                             
-                            const reader = new FileReader();
-                            reader.onload = function(event) {
-                                uploadedImages.push(event.target.result);
-                                
-                                const previewItem = document.createElement('div');
-                                previewItem.className = 'relative';
-                                previewItem.innerHTML = `
-                                    <img src="${event.target.result}" alt="预览" class="w-full h-24 object-cover rounded-lg">
-                                    <button onclick="removePreviewImage(${index})" class="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors duration-200">
-                                        <i class="fa fa-times text-xs"></i>
-                                    </button>
-                                `;
-                                imagePreviewEl.appendChild(previewItem);
-                            };
-                            reader.readAsDataURL(file);
-                        });
-                    }
-                });
-            }
+                            const previewItem = document.createElement('div');
+                            previewItem.className = 'relative';
+                            previewItem.innerHTML = `
+                                <img src="${event.target.result}" alt="预览" class="w-full h-24 object-cover rounded-lg">
+                                <button onclick="removePreviewImage(${index})" class="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors duration-200">
+                                    <i class="fa fa-times text-xs"></i>
+                                </button>
+                            `;
+                            imagePreview.appendChild(previewItem);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+            });
             
             // 清除所有标记
-            const clearAllBtnEl = document.getElementById('clearAll');
-            if (clearAllBtnEl) {
-                clearAllBtnEl.addEventListener('click', async function() {
-                    if (!currentUser || !supabase) {
-                        showToast('请先登录');
-                        return;
-                    }
-                    
-                    if (confirm('确定要清除所有标记吗？')) {
-                        try {
-                            const { error } = await supabase
-                                .from('travel_footprints')
-                                .delete()
-                                .eq('user_id', currentUser.id);
-                            
-                            if (!error) {
-                                visitedProvinces = [];
-                                updateMap();
-                                updateStats();
-                                updateRecentVisited();
-                                showToast('所有标记已清除');
-                            }
-                        } catch (error) {
-                            showToast('操作失败：' + error.message);
+            const clearAllBtn = document.getElementById('clearAll');
+            clearAllBtn.addEventListener('click', async function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    return;
+                }
+                
+                if (confirm('确定要清除所有标记吗？')) {
+                    try {
+                        const { error } = await supabase
+                            .from('travel_footprints')
+                            .delete()
+                            .eq('user_id', currentUser.id);
+                        
+                        if (!error) {
+                            visitedProvinces = [];
+                            updateMap();
+                            updateStats();
+                            updateRecentVisited();
+                            showToast('所有标记已清除');
                         }
+                    } catch (error) {
+                        showToast('操作失败：' + error.message);
                     }
-                });
-            }
+                }
+            });
             
             // 导出地图
-            const exportMapBtnEl = document.getElementById('exportMap');
-            if (exportMapBtnEl) {
-                exportMapBtnEl.addEventListener('click', function() {
-                    const myChart = window.chinaMapInstance;
-                    if (!myChart) {
-                        showToast('地图实例未找到');
-                        return;
-                    }
-                    
-                    const imgData = myChart.getDataURL({
-                        type: 'png',
-                        pixelRatio: 2,
-                        backgroundColor: '#fff'
-                    });
-                    
-                    const link = document.createElement('a');
-                    link.href = imgData;
-                    link.download = '我的旅行足迹.png';
-                    link.click();
-                    
-                    showToast('地图导出成功');
+            const exportMapBtn = document.getElementById('exportMap');
+            exportMapBtn.addEventListener('click', function() {
+                const myChart = window.chinaMapInstance;
+                const imgData = myChart.getDataURL({
+                    type: 'png',
+                    pixelRatio: 2,
+                    backgroundColor: '#fff'
                 });
-            }
+                
+                const link = document.createElement('a');
+                link.href = imgData;
+                link.download = '我的旅行足迹.png';
+                link.click();
+                
+                showToast('地图导出成功');
+            });
             
             // 分享地图
-            const shareMapBtnEl = document.getElementById('shareMap');
-            if (shareMapBtnEl) {
-                shareMapBtnEl.addEventListener('click', function() {
-                    if (!currentUser) {
-                        showToast('请先登录');
-                        if (loginBtnEl) loginBtnEl.click();
-                        return;
-                    }
-                    
-                    showToast('分享功能开发中，敬请期待');
-                });
-            }
+            const shareMapBtn = document.getElementById('shareMap');
+            shareMapBtn.addEventListener('click', function() {
+                if (!currentUser) {
+                    showToast('请先登录');
+                    loginBtn.click();
+                    return;
+                }
+                
+                showToast('分享功能开发中，敬请期待');
+            });
             
             // 加载更多分享
-            const loadMoreBtnEl = document.getElementById('loadMoreBtn');
-            if (loadMoreBtnEl) {
-                loadMoreBtnEl.addEventListener('click', function() {
-                    showToast('已加载全部内容');
-                });
-            }
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            loadMoreBtn.addEventListener('click', function() {
+                showToast('已加载全部内容');
+            });
             
             // 个人中心登录按钮
-            const loginFromProfileBtnEl = document.getElementById('loginFromProfileBtn');
-            if (loginFromProfileBtnEl && loginBtnEl) {
-                loginFromProfileBtnEl.addEventListener('click', function() {
-                    loginBtnEl.click();
-                });
-            }
+            const loginFromProfileBtn = document.getElementById('loginFromProfileBtn');
+            loginFromProfileBtn.addEventListener('click', function() {
+                loginBtn.click();
+            });
             
             // 开始标记按钮
-            const startMarkingBtnEl = document.getElementById('startMarkingBtn');
-            if (startMarkingBtnEl) {
-                startMarkingBtnEl.addEventListener('click', function() {
-                    const mapSectionEl = document.getElementById('map');
-                    if (mapSectionEl) {
-                        mapSectionEl.scrollIntoView({ behavior: 'smooth' });
-                    }
-                });
-            }
+            const startMarkingBtn = document.getElementById('startMarkingBtn');
+            startMarkingBtn.addEventListener('click', function() {
+                document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
+            });
             
             // 查看分享按钮
-            const viewSharesBtnEl = document.getElementById('viewSharesBtn');
-            if (viewSharesBtnEl) {
-                viewSharesBtnEl.addEventListener('click', function() {
-                    const shareSectionEl = document.getElementById('share');
-                    if (shareSectionEl) {
-                        shareSectionEl.scrollIntoView({ behavior: 'smooth' });
-                    }
-                });
-            }
+            const viewSharesBtn = document.getElementById('viewSharesBtn');
+            viewSharesBtn.addEventListener('click', function() {
+                document.getElementById('share').scrollIntoView({ behavior: 'smooth' });
+            });
             
             // 平滑滚动
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1699,15 +1511,10 @@
         function removePreviewImage(index) {
             uploadedImages.splice(index, 1);
             const previewItems = document.querySelectorAll('#imagePreview > div');
-            if (previewItems[index]) {
-                previewItems[index].remove();
-            }
+            previewItems[index].remove();
             
             if (uploadedImages.length === 0) {
-                const imagePreviewEl = document.getElementById('imagePreview');
-                if (imagePreviewEl) {
-                    imagePreviewEl.classList.add('hidden');
-                }
+                document.getElementById('imagePreview').classList.add('hidden');
             }
         }
 
@@ -1735,29 +1542,22 @@
         }
 
         // 监听Auth状态变化
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.supabase && window.supabase.createClient) {
-                // 重新初始化Supabase以确保auth监听器正常工作
-                const tempSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
-                tempSupabase.auth.onAuthStateChange(async (event, session) => {
-                    if (event === 'SIGNED_IN' && session?.user) {
-                        currentUser = session.user;
-                        await fetchUserProfile();
-                        await fetchUserFootprints();
-                        await fetchUserShares();
-                        updateUIForLoggedInUser();
-                        showToast('登录成功！');
-                    } else if (event === 'SIGNED_OUT') {
-                        currentUser = null;
-                        visitedProvinces = [];
-                        updateUIForLoggedOutUser();
-                        updateStats();
-                        updateRecentVisited();
-                        updateMap();
-                        showToast('已退出登录');
-                    }
-                });
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                currentUser = session.user;
+                await fetchUserProfile();
+                await fetchUserFootprints();
+                await fetchUserShares();
+                updateUIForLoggedInUser();
+                showToast('登录成功！');
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                visitedProvinces = [];
+                updateUIForLoggedOutUser();
+                updateStats();
+                updateRecentVisited();
+                updateMap();
+                showToast('已退出登录');
             }
         });
     </script>
