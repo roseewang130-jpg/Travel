@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/v4-shims.min.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     
     <script>
@@ -760,7 +759,7 @@
     </div>
 
     <script>
-        // Supabase配置 - 已替换为你的实际配置
+        // Supabase配置 - 请替换为你的实际配置
         const SUPABASE_URL = 'https://wdncyjjunekqxqmdqcka.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkbmN5anV1bmVrcXhxbWRxY2thIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MTUyNjgsImV4cCI6MjA4ODA5MTI2OH0.tdSfWnQtVsaBpJFzsofkJndhdTXjhuuHF3SPezVLOZA';
 
@@ -855,22 +854,27 @@
 
         // 检查登录状态
         async function checkLoginStatus() {
-            const { data: { user }, error } = await supabase.auth.getUser();
-            
-            if (user) {
-                currentUser = user;
-                // 获取用户详细信息
-                await fetchUserProfile();
-                // 获取用户足迹
-                await fetchUserFootprints();
-                // 获取用户分享
-                await fetchUserShares();
-                // 更新UI
-                updateUIForLoggedInUser();
-            } else {
-                currentUser = null;
-                visitedProvinces = [];
-                updateUIForLoggedOutUser();
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (user) {
+                    currentUser = user;
+                    // 获取用户详细信息
+                    await fetchUserProfile();
+                    // 获取用户足迹
+                    await fetchUserFootprints();
+                    // 获取用户分享
+                    await fetchUserShares();
+                    // 更新UI
+                    updateUIForLoggedInUser();
+                } else {
+                    currentUser = null;
+                    visitedProvinces = [];
+                    updateUIForLoggedOutUser();
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showToast('检查登录状态失败，请刷新页面重试');
             }
         }
 
@@ -878,18 +882,22 @@
         async function fetchUserProfile() {
             if (!currentUser) return;
             
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', currentUser.id)
-                .single();
-            
-            if (data) {
-                currentUser.profile = data;
-                updateUserProfileUI();
-            } else if (error && error.code === 'PGRST116') {
-                // 用户资料不存在，创建新资料
-                await createUserProfile();
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+                
+                if (data) {
+                    currentUser.profile = data;
+                    updateUserProfileUI();
+                } else if (error && error.code === 'PGRST116') {
+                    // 用户资料不存在，创建新资料
+                    await createUserProfile();
+                }
+            } catch (error) {
+                console.error('获取用户资料失败:', error);
             }
         }
 
@@ -897,18 +905,22 @@
         async function createUserProfile() {
             if (!currentUser) return;
             
-            const { data, error } = await supabase
-                .from('users')
-                .insert({
-                    id: currentUser.id,
-                    email: currentUser.email,
-                    name: currentUser.email.split('@')[0]
-                })
-                .single();
-            
-            if (data) {
-                currentUser.profile = data;
-                updateUserProfileUI();
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert({
+                        id: currentUser.id,
+                        email: currentUser.email,
+                        name: currentUser.email.split('@')[0]
+                    })
+                    .single();
+                
+                if (data) {
+                    currentUser.profile = data;
+                    updateUserProfileUI();
+                }
+            } catch (error) {
+                console.error('创建用户资料失败:', error);
             }
         }
 
@@ -916,17 +928,21 @@
         async function fetchUserFootprints() {
             if (!currentUser) return;
             
-            const { data, error } = await supabase
-                .from('travel_footprints')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('visited_at', { ascending: false });
-            
-            if (data) {
-                visitedProvinces = data.map(item => item.province);
-                updateStats();
-                updateRecentVisited();
-                updateMap();
+            try {
+                const { data, error } = await supabase
+                    .from('travel_footprints')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('visited_at', { ascending: false });
+                
+                if (data) {
+                    visitedProvinces = data.map(item => item.province);
+                    updateStats();
+                    updateRecentVisited();
+                    updateMap();
+                }
+            } catch (error) {
+                console.error('获取用户足迹失败:', error);
             }
         }
 
@@ -934,14 +950,18 @@
         async function fetchUserShares() {
             if (!currentUser) return;
             
-            const { data, error } = await supabase
-                .from('travel_shares')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('created_at', { ascending: false });
-            
-            if (data) {
-                updateUserSharesGrid(data);
+            try {
+                const { data, error } = await supabase
+                    .from('travel_shares')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+                
+                if (data) {
+                    updateUserSharesGrid(data);
+                }
+            } catch (error) {
+                console.error('获取用户分享失败:', error);
             }
         }
 
@@ -1242,8 +1262,11 @@
             
             emailLoginBtn.addEventListener('click', async function() {
                 try {
+                    const email = prompt('请输入你的邮箱');
+                    if (!email) return;
+                    
                     const { data, error } = await supabase.auth.signInWithOtp({
-                        email: prompt('请输入你的邮箱'),
+                        email: email,
                         options: {
                             emailRedirectTo: window.location.origin
                         }
