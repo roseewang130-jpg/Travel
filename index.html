@@ -761,11 +761,13 @@
 
     <script>
         // Supabase配置 - 请替换为你的实际配置
-        const SUPABASE_URL = 'sb_publishable_rseVUmbu65NRLNGgdqreCA_j0SJATZ2';
+        const SUPABASE_URL = 'https://wdncyjuunekqxqmdqcka.supabase.co'.trim();
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkbmN5anV1bmVrcXhxbWRxY2thIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MTUyNjgsImV4cCI6MjA4ODA5MTI2OH0.tdSfWnQtVsaBpJFzsofkJndhdTXjhuuHF3SPezVLOZA';
 
         // 初始化Supabase客户端
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // ✅ 修改后的代码
+const { createClient } = window.supabase; 
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 全局变量
         let currentUser = null;
@@ -855,7 +857,7 @@
 
         // 检查登录状态
         async function checkLoginStatus() {
-            const { data: { user }, error } = await supabase.auth.getUser();
+            const { data: { user }, error } = await supabaseClient.auth.getUser();
             
             if (user) {
                 currentUser = user;
@@ -1242,7 +1244,7 @@
             
             emailLoginBtn.addEventListener('click', async function() {
                 try {
-                    const { data, error } = await supabase.auth.signInWithOtp({
+                    const { data, error } = await supabaseClient.auth.signInWithOtp({
                         email: prompt('请输入你的邮箱'),
                         options: {
                             emailRedirectTo: window.location.origin
@@ -1260,7 +1262,7 @@
             
             githubLoginBtn.addEventListener('click', async function() {
                 try {
-                    const { data, error } = await supabase.auth.signInWithOAuth({
+                    const { data, error } = await supabaseClient.auth.signInWithOAuth({
                         provider: 'github',
                         options: {
                             redirectTo: window.location.origin
@@ -1273,7 +1275,7 @@
             
             googleLoginBtn.addEventListener('click', async function() {
                 try {
-                    const { data, error } = await supabase.auth.signInWithOAuth({
+                    const { data, error } = await supabaseClient.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                             redirectTo: window.location.origin
@@ -1288,7 +1290,7 @@
             const logoutBtn = document.getElementById('logoutBtn');
             logoutBtn.addEventListener('click', async function() {
                 try {
-                    const { error } = await supabase.auth.signOut();
+                    const { error } = await supabaseClient.auth.signOut();
                     if (!error) {
                         currentUser = null;
                         visitedProvinces = [];
@@ -1542,7 +1544,7 @@
         }
 
         // 监听Auth状态变化
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
                 currentUser = session.user;
                 await fetchUserProfile();
@@ -1563,4 +1565,5 @@
     </script>
 </body>
 </html>
+
 
